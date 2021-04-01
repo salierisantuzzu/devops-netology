@@ -1,5 +1,5 @@
 # My project
 
-one new line;
-one second line;
-test line;
+one new line\n
+one second line\n
+test line\n
