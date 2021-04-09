@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>dz_2_4</title>
+</head>
+
+<body>
+
+    <h2>Домашнее задание 2.4. Инструменты Git</h2>
+
+<h3>В виде результата напишите текстом ответы на вопросы и каким образом эти
+ответы были получены.</h3>
+<p>
+1. Найдите полный хеш и комментарий коммита, хеш которого начинается на aefea.
+</p>
+
+
+git show aefea<br>
+Хэш: aefead2207ef7e2aa5dc81a34aedf0cad4c32545<br>
+Комментарий: Update CHANGELOG.md<br>
+###<br>
+
+<p>
+2. Какому тегу соответствует коммит 85024d3
+</p>
+
+git show 85024d3<br>
+commit 85024d3100126de36331c6982bfaac02cdab9e76 (tag: v0.12.23)<br>
+Тэг: v0.12.23<br>
+###<br>
+
+<p>
+3. Сколько родителей у коммита b8d720? Напишите их хеши.
+</p>
+
+git show b8d720^<br>
+или<br>
+git log b8d720^ -1<br>
+Кол-во родителей: 2<br>
+Хэши родителей: 58dcac4b7 и ffbcf5581<br>
+Полные хэши:<br>
+git show 58dcac4b7<br>
+58dcac4b798f0a2421170d84e507a42838101648<br>
+git show ffbcf5581<br>
+ffbcf55817cb96f6d5ffe1a34abe963b159bf34e<br>
+###<br>
+
+<p>
+4. Перечислите хеши и комментарии всех коммитов которые были сделаны между
+тегами v0.12.23 и v0.12.24
+</p>
+
+git log v0.12.23 v0.12.24<br>
+commit 33ff1c03bb960b332be3af2e333462dde88b279e (tag: v0.12.24)<br>
+    v0.12.24<br>
+<br>
+commit b14b74c4939dcab573326f4e3ee2a62e23e12f89<br>
+    [Website] vmc provider links<br>
+<br>
+commit 3f235065b9347a758efadc92295b540ee0a5e26e<br>
+    Update CHANGELOG.md<br>
+<br>
+commit 6ae64e247b332925b872447e9ce869657281c2bf<br>
+    registry: Fix panic when server is unreachable<br>
+<br>    
+    Non-HTTP errors previously resulted in a panic due to dereferencing the<br>
+    resp pointer while it was nil, as part of rendering the error message.<br>
+    This commit changes the error message formatting to cope with a nil<br>
+    response, and extends test coverage.<br>
+<br>    
+    Fixes #24384
+<br>
+commit 5c619ca1baf2e21a155fcdb4c264cc9e24a2a353<br>
+    website: Remove links to the getting started guide's old location<br>
+<br>    
+    Since these links were in the soon-to-be-deprecated 0.11 language<br>
+    section, I think we can just remove them without needing to find an<br>
+    equivalent link.<br>
+<br>
+commit 06275647e2b53d97d4f0a19a0fec11f6d69820b5<br>
+    Update CHANGELOG.md<br>
+<br>
+commit d5f9411f5108260320064349b757f55c09bc4b80<br>
+    command: Fix bug when using terraform login on Windows<br>
+<br>
+commit 4b6d06cc5dcb78af637bbb19c198faff37a066ed<br>
+    Update CHANGELOG.md<br>
+    website: Remove links to the getting started guide's old location<br>
+<br>
+    Since these links were in the soon-to-be-deprecated 0.11 language<br>
+    section, I think we can just remove them without needing to find an<br>
+    equivalent link.<br>
+<br>
+commit 06275647e2b53d97d4f0a19a0fec11f6d69820b5<br>
+    Update CHANGELOG.md<br>
+<br>
+commit d5f9411f5108260320064349b757f55c09bc4b80<br>
+    Since these links were in the soon-to-be-deprecated 0.11 language<br>
+    section, I think we can just remove them without needing to find an<br>
+    equivalent link.<br>
+<br>
+commit 06275647e2b53d97d4f0a19a0fec11f6d69820b5<br>
+    Update CHANGELOG.md<br>
+<br>
+commit d5f9411f5108260320064349b757f55c09bc4b80<br>
+    command: Fix bug when using terraform login on Windows<br>
+<br>
+commit 4b6d06cc5dcb78af637bbb19c198faff37a066ed<br>
+    Update CHANGELOG.md<br>
+<br>
+commit dd01a35078f040ca984cdd349f18d0b67e486c35<br>
+    Update CHANGELOG.md<br>
+<br>
+commit 225466bc3e5f35baa5d07197bbc079345b77525e<br>
+    Cleanup after v0.12.23 release<br>
+<br>
+commit 85024d3100126de36331c6982bfaac02cdab9e76 (tag: v0.12.23)<br>
+    v0.12.23<br>
+###<br>
+
+<p>
+5. Найдите коммит в котором была создана функция func providerSource,<br>
+ее определение в коде выглядит так func providerSource(...)<br>
+(вместо троеточего перечислены аргументы)
+</p>
+
+git log -S "func providerSource("<br>
+commit 8c928e83589d90a031f811fae52a81be7153e82f<br>
+git log -S "func providerSource(" --oneline<br>
+8c928e835 main: Consult local directories as potential mirrors of providers<br>
+###<br>
+
+<p>
+6. Найдите все коммиты в которых была изменена функция globalPluginDirs
+</p>
+
+git log -S "globalPluginDirs"<br>
+commit 35a058fb3ddfae9cfee0b3893822c9a95b920f4c<br>
+commit c0b17610965450a89598da491ce9b6b5cbd6393f<br>
+commit 8364383c359a6b738a436d1b7745ccdce178df47<br>
+<br>
+git log -S "globalPluginDirs" --oneline<br>
+<br>
+35a058fb3 main: configure credentials from the CLI config file<br>
+c0b176109 prevent log output during init<br>
+8364383c3 Push plugin discovery down into command package<br>
+###<br>
+
+<p>
+7. Кто автор функции synchronizedWriters
+</p>
+
+git log -S "synchronizedWriters"<br>
+commit 5ac311e2a91e381e2f52234668b49ba670aa0fe5<br>
+Author: Martin Atkins <mart@degeneration.co.uk><br>
+Date:   Wed May 3 16:25:41 2017 -0700<br>
+<br>
+Удостовериться что функция добавлена<br>
+git show 5ac311e2a91e381e2f52234668b49ba670aa0fe5<br>
+###<br>
+
+</body>
+
+</html>
