@@ -1,0 +1,31 @@
+10. Основываясь на предыдущем вопросе, как создать однократным вызовом
+touch 100000 файлов? А получилось ли создать 300000?
+    
+    mkdir ./tmp && cd ./tmp
+    touch file-{0..100000}
+    Получилось создать заданное количество файлов с именами начиная с
+    file-0 и заканчивая file-100000
+    
+    Создать 300000 файлов не получилось
+    touch file-{0..300000}
+    Вызывает сообщение:
+    -bash: /bin/touch: Argument list too long
+***
+
+
+12. Основываясь на знаниях о просмотре текущих (например, PATH) и установке
+новых переменных; командах, которые мы рассматривали, добейтесь в выводе
+type -a bash в виртуальной машине наличия первым пунктом в списке:
+
+bash is /tmp/new_path_directory/bash
+bash is /usr/local/bin/bash
+bash is /bin/bash
+
+    07_new_path_dir_bash.png
+
+    PATH=/tmp/new_path_directory/:/tmp/newnew/:/bin/:/usr/local/bin/
+    vagrant@vagrant:~$ type -a bash
+    bash is /tmp/new_path_directory/bash
+    bash is /tmp/newnew/bash
+    bash is /bin/bash
+***
