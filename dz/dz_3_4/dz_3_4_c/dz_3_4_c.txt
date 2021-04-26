@@ -1,0 +1,38 @@
+1. На лекции мы познакомились с node_exporter. В демонстрации его исполняемый
+файл запускался в background. Этого достаточно для демо, но не для настоящей
+production-системы, где процессы должны находиться под внешним управлением.
+Используя знания из лекции по systemd, создайте самостоятельно простой unit-файл
+для node_exporter:
+    поместите его в автозагрузку,
+    предусмотрите возможность добавления опций к запускаемому процессу через
+    внешний файл (посмотрите, например, на systemctl cat cron),
+    удостоверьтесь, что с помощью systemctl процесс корректно стартует,
+    завершается, а после перезагрузки автоматически поднимается.
+
+Насколько понял, для возможности добавления опций к запускаемому процессу через
+внешний файл, можно поступить следующим образом:
+а) sudo nano /etc/systemd/system/node_exporter.service
+В секции [Service]
+добавить строку
+EnvironmentFile=/etc/sysconfig/node_exporter
+поменять строку
+ExecStart=/usr/local/bin/node_exporter
+на
+ExecStart=/usr/local/bin/node_exporter $OPTIONS
+б) создать директорию и файл
+sudo mkdir -p /etc/sysconfig
+sudo nano /etc/sysconfig/node_exporter
+с содержимым
+OPTIONS="--collector.textfile.directory /var/lib/node_exporter/textfile_collector" 
+(опции посмотреть в /usr/local/bin/node_exporter --help)
+в) Перезапустите systemd и настройте node_exporter на автостарт при загрузке
+системы:
+sudo systemctl daemon-reload
+sudo systemctl enable node_exporter
+Запустите сервис node_exporter:
+sudo systemctl start node_exporter
+г) После установки Node Exporter, проверьте что метрики экспортируются:
+curl http://localhost:9100/metrics
+
+Скрины - 01_01_c.png 01_02_c.png
+********************************************************************************
