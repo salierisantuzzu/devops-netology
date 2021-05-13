@@ -1,0 +1,96 @@
+Домашнее задание к занятию "3.9. Элементы безопасности информационных систем"
+********************************************************************************
+
+1. Установите Hashicorp Vault (https://learn.hashicorp.com/vault) в виртуальной
+машине Vagrant/VirtualBox. Это не является обязательным для выполнения задания,
+но для лучшего понимания что происходит при выполнении команд (посмотреть
+результат в UI), можно по аналогии с netdata из прошлых лекций пробросить порт
+Vault на localhost:
+config.vm.network "forwarded_port", guest: 8200, host: 8200
+Однако, обратите внимание, что только-лишь проброса порта не будет достаточно
+по-умолчанию Vault слушает на 127.0.0.1; добавьте к опциям запуска
+-dev-listen-address="0.0.0.0:8200".
+
+Скрины - 01_01.png - 01_04.png
+********************************************************************************
+
+2. Запустить Vault-сервер в dev-режиме (дополнив ключ -dev упомянутым выше
+-dev-listen-address, если хотите увидеть UI).
+
+Скрин - 02_01.png
+********************************************************************************
+
+3. Используя PKI Secrets Engine (https://www.vaultproject.io/docs/secrets/pki),
+создайте Root CA и Intermediate CA. Обратите
+внимание на дополнительные материалы
+(https://learn.hashicorp.com/tutorials/vault/pki-engine)
+по созданию CA в Vault, если с изначальной инструкцией возникнут сложности.
+
+Скрины - 03_01.png - 03_04.png
+********************************************************************************
+
+4. Согласно этой же инструкции, подпишите Intermediate CA csr на сертификат для
+тестового домена (например, netology.example.com если действовали согласно
+инструкции).
+
+Скрины - 04_01.png - 04_02.png
+********************************************************************************
+
+5. Поднимите на localhost nginx, сконфигурируйте default vhost для использования
+подписанного Vault Intermediate CA сертификата и выбранного вами домена.
+Сертификат из Vault подложить в nginx руками.
+
+Скрины - 05_01.png - 05_03.png
+********************************************************************************
+
+6. Модифицировав /etc/hosts и системный trust-store
+(http://manpages.ubuntu.com/manpages/focal/en/man8/update-ca-certificates.8.html),
+добейтесь безошибочной с точки зрения HTTPS работы curl на ваш тестовый домен
+(отдающийся с localhost). Рекомендуется добавлять в доверенные сертификаты
+Intermediate CA. Root CA добавить было бы правильнее, но тогда при конфигурации
+nginx потребуется включить в цепочку Intermediate, что выходит за рамки лекции.
+Так же, пожалуйста, не добавляйте в доверенные сам сертификат хоста.
+
+Скрины - 06_01.png - 06_02.png
+********************************************************************************
+
+7. Ознакомьтесь (https://letsencrypt.org/ru/docs/client-options/) с протоколом
+ACME и CA Let's encrypt. Если у вас есть во владении доменное имя с платным
+TLS-сертификатом, который возможно заменить на LE, или же без HTTPS вообще,
+попробуйте воспользоваться одним из предложенных клиентов, чтобы сделать
+веб-сайт безопасным (или перестать платить за коммерческий сертификат).
+
+С CA Let's encrypt знаком, но во владении платного доменного имени не имею.
+Применял следующим образом.
+Сервер (Debian/Ubuntu);
+Доменное имя (бесплатное) или для тестов (No-IP + домашний/рабочий IP-адрес);
+Софт в зависимости от того что нужно тестировать (из последнего dokuwiki) для
+удобства работы отдела;
+Веб-сервер Apache (с nginx не знаком на должном уровне);
+Далее примерно так:
+    ufw allow 80 # Необходимо для обновления сертификатов Let's encrypt
+    ufw allow 443
+    nano /etc/apache2/sites-available/dokuwiki.conf
+    a2ensite dokuwiki.conf
+    systemctl reload apache2
+    a2enmod ssl
+    systemctl restart apache2
+    apt install certbot python-certbot-apache
+    certbot --authenticator webroot --installer apache -d wiki.site_name.name
+        2: Renew & replace the cert (limit ~5 per 7 days)
+        2: Redirect - Make all requests redirect to secure HTTPS access. Choose this for
+            new sites, or if you're confident your site works on HTTPS. You can undo this
+            change by editing your web server's configuration.
+            IMPORTANT NOTES:
+             - Congratulations! Your certificate and chain have been saved at:
+              /etc/letsencrypt/live/wiki.site_name.name/fullchain.pem ...
+    nano /etc/apache2/sites-available/dokuwiki-le-ssl.conf
+Проверить обновляется ли:
+    certbot renew --cert-name wiki.site_name.name --dry-run
+Обновить руками:
+    certbot --apache -d wiki.site_name.name
+Есть расписание (/cron.d/certbot) для автообновления. Создаётся автоматически,
+но можно корректировать.
+
+Скрины - 07_01.png 07_03.png
+********************************************************************************
