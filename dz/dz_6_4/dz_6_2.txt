@@ -1,0 +1,495 @@
+Домашнее задание к занятию "6.2. SQL"
+********************************************************************************
+
+Введение
+Перед выполнением задания вы можете ознакомиться с дополнительными материалами.
+
+
+Задача 1.
+*********
+
+Используя docker поднимите инстанс PostgreSQL (версию 12) c 2 volume, в который
+будут складываться данные БД и бэкапы.
+Приведите получившуюся команду или docker-compose манифест.
+
+docker-compose.yml
+--------------------------------------------------------------------------------
+version: '3'
+
+services:
+  pg_daten:
+    image: postgres:12
+    restart: always
+    environment:
+      - POSTGRES_PASSWORD=secret
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=stage
+    volumes:
+      - ./pg_daten:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  pg_backup:
+    image: postgres:12
+    restart: always
+    environment:
+      - POSTGRES_PASSWORD=secret
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=stage
+    volumes:
+      - ./pg_backup:/var/lib/postgresql/data
+    ports:
+      - "5433:5433"
+--------------------------------------------------------------------------------
+
+docker exec -it postgres_pg_daten_1 /bin/bash
+docker exec -it postgres_pg_backup_1 /bin/bash
+
+psql -h 172.18.0.2 -U postgres
+psql -h 172.18.0.3 -U postgres
+
+********************************************************************************
+
+Задача 2.
+*********
+
+В БД из задачи 1:
+    - создайте пользователя test-admin-user и БД test_db
+CREATE USER "test-admin-user" WITH PASSWORD 'admin';
+CREATE DATABASE test_db OWNER = "test-admin-user";
+        
+    - в БД test_db создайте таблицу orders и clients (спeцификация таблиц ниже)
+    
+\connect test_db
+CREATE TABLE orders (id SERIAL PRIMARY KEY, наименование CHAR(20), цена INT);
+CREATE TABLE clients (id SERIAL PRIMARY KEY, фамилия CHAR(20), "страна проживания" CHAR(20), заказ INT, FOREIGN KEY (заказ) REFERENCES orders (id));
+CREATE INDEX CONCURRENTLY client_country_index ON clients ("страна проживания");
+    
+    - предоставьте привилегии на все операции пользователю test-admin-user на
+    таблицы БД test_db
+    
+GRANT ALL PRIVILEGES ON TABLE orders TO "test-admin-user";
+GRANT ALL PRIVILEGES ON TABLE clients TO "test-admin-user";
+    
+    - создайте пользователя test-simple-user
+    
+CREATE USER "test-simple-user" WITH PASSWORD 'user';
+    
+    - предоставьте пользователю test-simple-user права на
+    SELECT/INSERT/UPDATE/DELETE данных таблиц БД test_db
+    
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE orders TO "test-simple-user";
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE clients TO "test-simple-user";
+
+Таблица orders:
+    id (serial primary key)
+    наименование (string)
+    цена (integer)
+
+Таблица clients:
+    id (serial primary key)
+    фамилия (string)
+    страна проживания (string, index)
+    заказ (foreign key orders)
+
+Приведите:
+
+    - итоговый список БД после выполнения пунктов выше
+    
+test_db=# \l
+                                 List of databases
+   Name    |  Owner   | Encoding |  Collate   |   Ctype    |   Access privileges   
+-----------+----------+----------+------------+------------+-----------------------
+ postgres  | postgres | UTF8     | en_US.utf8 | en_US.utf8 | 
+ stage     | postgres | UTF8     | en_US.utf8 | en_US.utf8 | 
+ template0 | postgres | UTF8     | en_US.utf8 | en_US.utf8 | =c/postgres          +
+           |          |          |            |            | postgres=CTc/postgres
+ template1 | postgres | UTF8     | en_US.utf8 | en_US.utf8 | =c/postgres          +
+           |          |          |            |            | postgres=CTc/postgres
+ test_db   | postgres | UTF8     | en_US.utf8 | en_US.utf8 | =Tc/postgres         +
+           |          |          |            |            | postgres=CTc/postgres
+(5 rows)
+
+    
+    - описание таблиц (describe)
+    
+test_db=# \dt
+          List of relations
+ Schema |  Name   | Type  |  Owner   
+--------+---------+-------+----------
+ public | clients | table | postgres
+ public | orders  | table | postgres
+(2 rows)
+
+test_db=# \d orders;
+                                  Table "public.orders"
+    Column    |     Type      | Collation | Nullable |              Default               
+--------------+---------------+-----------+----------+------------------------------------
+ id           | integer       |           | not null | nextval('orders_id_seq'::regclass)
+ наименование | character(20) |           |          | 
+ цена         | integer       |           |          | 
+Indexes:
+    "orders_pkey" PRIMARY KEY, btree (id)
+    
+test_db=# \d clients;
+                                     Table "public.clients"
+      Column       |     Type      | Collation | Nullable |               Default               
+-------------------+---------------+-----------+----------+-------------------------------------
+ id                | integer       |           | not null | nextval('clients_id_seq'::regclass)
+ фамилия           | character(20) |           |          | 
+ страна проживания | character(20) |           |          | 
+ заказ             | character(20) |           |          | 
+Indexes:
+    "clients_pkey" PRIMARY KEY, btree (id)
+    "client_country_index" btree ("страна проживания")
+    
+
+    - SQL-запрос для выдачи списка пользователей с правами над таблицами test_db
+    
+test_db-# \du+
+                                              List of roles
+    Role name     |                         Attributes                         | Member of | Description 
+------------------+------------------------------------------------------------+-----------+-------------
+ postgres         | Superuser, Create role, Create DB, Replication, Bypass RLS | {}        | 
+ test-admin-user  |                                                            | {}        | 
+ test-simple-user |                                                            | {}        | 
+
+
+
+    - список пользователей с правами над таблицами test_db
+    
+test_db=# \dp
+                                           Access privileges
+ Schema |      Name      |   Type   |         Access privileges          | Column privileges | Policies 
+--------+----------------+----------+------------------------------------+-------------------+----------
+ public | clients        | table    | postgres=arwdDxt/postgres         +|                   | 
+        |                |          | "test-admin-user"=arwdDxt/postgres+|                   | 
+        |                |          | "test-simple-user"=arwd/postgres   |                   | 
+ public | clients_id_seq | sequence |                                    |                   | 
+ public | orders         | table    | postgres=arwdDxt/postgres         +|                   | 
+        |                |          | "test-admin-user"=arwdDxt/postgres+|                   | 
+        |                |          | "test-simple-user"=arwd/postgres   |                   | 
+ public | orders_id_seq  | sequence |                                    |                   | 
+(4 rows)
+
+********************************************************************************
+
+Задача 3.
+*********
+
+Используя SQL синтаксис - наполните таблицы следующими тестовыми данными:
+
+Таблица orders
+наименование    цена
+Шоколад         10
+Принтер         3000
+Книга           500
+Монитор         7000
+Гитара          4000
+
+INSERT INTO clients ("наименование", "цена") VALUES ('Шоколад', 10), ('Принтер', 3000), ('Книга', 500), ('Монитор', 7000), ('Гитара', 4000);
+INSERT 0 5
+    
+select * from orders;
+
+ id |     наименование     | цена 
+----+----------------------+------
+  1 | Шоколад              |   10
+  2 | Принтер              | 3000
+  3 | Книга                |  500
+  4 | Монитор              | 7000
+  5 | Гитара               | 4000
+(5 rows)
+
+
+Таблица clients
+фамилия                 страна проживания
+Иванов Иван Иванович    USA
+Петров Петр Петрович    Canada
+Иоганн Себастьян Бах    Japan
+Ронни Джеймс Дио        Russia
+Ritchie Blackmore       Russia
+
+INSERT INTO clients ("фамилия", "страна проживания") VALUES ('Иванов Иван Иванович', 'USA'), ('Петров Петр Петрович', 'Canada'), ('Иоганн Себастьян Бах', 'Japan'), ('Ронни Джеймс Дио', 'Russia'), ('Ritchie Blackmore', 'Russia');
+INSERT 0 5
+    
+select * from clients;
+
+ id |       фамилия        |  страна проживания   | заказ 
+----+----------------------+----------------------+-------
+  6 | Иванов Иван Иванович | USA                  |      
+  7 | Петров Петр Петрович | Canada               |      
+  8 | Иоганн Себастьян Бах | Japan                |      
+  9 | Ронни Джеймс Дио     | Russia               |      
+ 10 | Ritchie Blackmore    | Russia               |      
+(5 rows)
+
+
+Используя SQL синтаксис:
+    - вычислите количество записей для каждой таблицы
+    
+SELECT count(*) FROM orders;
+ count 
+-------
+     5
+(1 row)
+
+SELECT count(*) FROM clients;
+ count 
+-------
+     5
+(1 row)
+    
+    - приведите в ответе:
+        - запросы
+        - результаты их выполнения.
+        
+Запросы и результаты приведены по ходу выполнения работы.
+
+********************************************************************************
+
+Задача 4.
+*********
+
+Часть пользователей из таблицы clients решили оформить заказы из таблицы orders.
+Используя foreign keys свяжите записи из таблиц, согласно таблице:
+фамилия                 заказ
+Иванов Иван Иванович    Книга
+Петров Петр Петрович    Монитор
+Иоганн Себастьян Бах    Гитара
+
+- Приведите SQL-запросы для выполнения данных операций.
+
+UPDATE clients SET заказ = (SELECT orders.наименование FROM orders WHERE orders.id = 3) WHERE clients.id = 6;
+UPDATE clients SET заказ = (SELECT orders.наименование FROM orders WHERE orders.id = 4) WHERE clients.id = 7;
+UPDATE clients SET заказ = (SELECT orders.наименование FROM orders WHERE orders.id = 5) WHERE clients.id = 8;
+
+- Приведите SQL-запрос для выдачи всех пользователей, которые совершили заказ,
+а также вывод данного запроса.
+
+SELECT фамилия, заказ FROM clients WHERE заказ IS NOT NULL;
+       фамилия        |        заказ         
+----------------------+----------------------
+ Иванов Иван Иванович | Книга               
+ Петров Петр Петрович | Монитор             
+ Иоганн Себастьян Бах | Гитара              
+(3 rows)
+
+Подсказка - используйте директиву UPDATE.
+
+********************************************************************************
+
+Задача 5.
+*********
+
+- Получите полную информацию по выполнению запроса выдачи всех пользователей из
+задачи 4 (используя директиву EXPLAIN).
+
+EXPLAIN SELECT фамилия, заказ FROM clients WHERE заказ IS NOT NULL;
+
+- Приведите получившийся результат и объясните что значат полученные значения.
+
+                       QUERY PLAN                        
+---------------------------------------------------------
+ Seq Scan on clients  (cost=0.00..1.05 rows=5 width=168)
+   Filter: ("заказ" IS NOT NULL)
+(2 rows)
+
+Числа, перечисленные в скобках (слева направо), имеют следующий смысл:
+- Приблизительная стоимость запуска. Это время, которое проходит, прежде чем
+начнётся этап вывода данных, например для сортирующего узла это время сортировки.
+- Приблизительная общая стоимость. Она вычисляется в предположении, что узел плана
+выполняется до конца, то есть возвращает все доступные строки. На практике
+родительский узел может досрочно прекратить чтение строк дочернего.
+- Ожидаемое число строк, которое должен вывести этот узел плана. При этом так же
+предполагается, что узел выполняется до конца.
+- Ожидаемый средний размер строк, выводимых этим узлом плана (в байтах).
+
+clients содержит 1,1 страниц диска и 5 строк ((1.05*1.0)+(5*0.01)) = 1,1
+Общая стоимость вычисляется как (число_чтений_диска * seq_page_cost)
++
+(число_просканированных_строк * cpu_tuple_cost).
+По умолчанию, seq_page_cost равно 1.0, а cpu_tuple_cost — 0.01, так что
+приблизительная стоимость запроса равна (1,05 * 1.0) + (5 * 0.01) = 1,1
+
+********************************************************************************
+
+Задача 6.
+*********
+
+- Создайте бэкап БД test_db и поместите его в volume, предназначенный для
+бэкапов (см. Задачу 1).
+
+- Остановите контейнер с PostgreSQL (но не удаляйте volumes).
+
+- Поднимите новый пустой контейнер с PostgreSQL.
+
+- Восстановите БД test_db в новом контейнере.
+
+- Приведите список операций, который вы применяли для бэкапа данных и
+восстановления.
+
+
+vagrant@vm-vagrant:~/postgres$ psql -h 172.18.0.2 -U postgres
+Password for user postgres: 
+psql (12.7 (Ubuntu 12.7-0ubuntu0.20.04.1))
+Type "help" for help.
+
+postgres=# \l
+                                 List of databases
+   Name    |  Owner   | Encoding |  Collate   |   Ctype    |   Access privileges   
+-----------+----------+----------+------------+------------+-----------------------
+ postgres  | postgres | UTF8     | en_US.utf8 | en_US.utf8 | 
+ stage     | postgres | UTF8     | en_US.utf8 | en_US.utf8 | 
+ template0 | postgres | UTF8     | en_US.utf8 | en_US.utf8 | =c/postgres          +
+           |          |          |            |            | postgres=CTc/postgres
+ template1 | postgres | UTF8     | en_US.utf8 | en_US.utf8 | =c/postgres          +
+           |          |          |            |            | postgres=CTc/postgres
+ test_db   | postgres | UTF8     | en_US.utf8 | en_US.utf8 | =Tc/postgres         +
+           |          |          |            |            | postgres=CTc/postgres
+(5 rows)
+
+
+vagrant@vm-vagrant:~/postgres$ psql -h 172.18.0.3 -U postgres
+Password for user postgres: 
+psql (12.7 (Ubuntu 12.7-0ubuntu0.20.04.1))
+Type "help" for help.
+
+postgres=# \l
+                                 List of databases
+   Name    |  Owner   | Encoding |  Collate   |   Ctype    |   Access privileges   
+-----------+----------+----------+------------+------------+-----------------------
+ postgres  | postgres | UTF8     | en_US.utf8 | en_US.utf8 | 
+ stage     | postgres | UTF8     | en_US.utf8 | en_US.utf8 | 
+ template0 | postgres | UTF8     | en_US.utf8 | en_US.utf8 | =c/postgres          +
+           |          |          |            |            | postgres=CTc/postgres
+ template1 | postgres | UTF8     | en_US.utf8 | en_US.utf8 | =c/postgres          +
+           |          |          |            |            | postgres=CTc/postgres
+(4 rows)
+
+
+pg_dumpall -U postgres -h 172.18.0.2 > /tmp/test_dump
+psql -U postgres -h 172.18.0.3 -f /tmp/test_dump postgres
+
+
+vagrant@vm-vagrant:~/postgres$ psql -h 172.18.0.3 -U postgres
+Password for user postgres: 
+psql (12.7 (Ubuntu 12.7-0ubuntu0.20.04.1))
+Type "help" for help.
+
+postgres=# \l
+                                 List of databases
+   Name    |  Owner   | Encoding |  Collate   |   Ctype    |   Access privileges   
+-----------+----------+----------+------------+------------+-----------------------
+ postgres  | postgres | UTF8     | en_US.utf8 | en_US.utf8 | 
+ stage     | postgres | UTF8     | en_US.utf8 | en_US.utf8 | 
+ template0 | postgres | UTF8     | en_US.utf8 | en_US.utf8 | =c/postgres          +
+           |          |          |            |            | postgres=CTc/postgres
+ template1 | postgres | UTF8     | en_US.utf8 | en_US.utf8 | =c/postgres          +
+           |          |          |            |            | postgres=CTc/postgres
+ test_db   | postgres | UTF8     | en_US.utf8 | en_US.utf8 | 
+(5 rows)
+
+
+vagrant@vm-vagrant:~/postgres$ docker ps -a
+CONTAINER ID   IMAGE         COMMAND                  CREATED        STATUS        PORTS                                                 NAMES
+50df0d604ca6   postgres:12   "docker-entrypoint.s…"   31 hours ago   Up 31 hours   5432/tcp, 0.0.0.0:5433->5433/tcp, :::5433->5433/tcp   postgres_pg_backup_1
+9b23427b154c   postgres:12   "docker-entrypoint.s…"   31 hours ago   Up 31 hours   0.0.0.0:5432->5432/tcp, :::5432->5432/tcp             postgres_pg_daten_1
+
+
+vagrant@vm-vagrant:~/postgres$ docker images
+REPOSITORY                 TAG               IMAGE ID       CREATED        SIZE
+salierisantuzzu/netology   postgres_backup   dc97b701b5cd   15 hours ago   314MB
+salierisantuzzu/netology   postgres_daten    dace363d88e9   15 hours ago   376MB
+postgres                   12                6f8cc63cce96   10 days ago    314MB
+
+
+vagrant@vm-vagrant:~/postgres$ docker rmi postgres:12 --force
+Untagged: postgres:12
+Untagged: postgres@sha256:0e103fd33b675eb558c6a4010112da6a554963d3454a549adb7edccaa1cce71d
+vagrant@vm-vagrant:~/postgres$ docker images
+REPOSITORY                 TAG               IMAGE ID       CREATED        SIZE
+salierisantuzzu/netology   postgres_backup   dc97b701b5cd   15 hours ago   314MB
+salierisantuzzu/netology   postgres_daten    dace363d88e9   15 hours ago   376MB
+vagrant@vm-vagrant:~/postgres$ docker ps -a
+CONTAINER ID   IMAGE          COMMAND                  CREATED        STATUS        PORTS                                                 NAMES
+50df0d604ca6   6f8cc63cce96   "docker-entrypoint.s…"   31 hours ago   Up 31 hours   5432/tcp, 0.0.0.0:5433->5433/tcp, :::5433->5433/tcp   postgres_pg_backup_1
+9b23427b154c   6f8cc63cce96   "docker-entrypoint.s…"   31 hours ago   Up 31 hours   0.0.0.0:5432->5432/tcp, :::5432->5432/tcp             postgres_pg_daten_1
+
+
+docker pull postgres:12
+
+
+vagrant@vm-vagrant:~/postgres$ docker images
+REPOSITORY                 TAG               IMAGE ID       CREATED        SIZE
+salierisantuzzu/netology   postgres_backup   dc97b701b5cd   16 hours ago   314MB
+salierisantuzzu/netology   postgres_daten    dace363d88e9   16 hours ago   376MB
+postgres                   12                6f8cc63cce96   10 days ago    314MB
+
+
+vagrant@vm-vagrant:~/postgres$ docker run -it -d --name new_postgres -p 5444:5434 postgres /bin/bash
+vagrant@vm-vagrant:~/postgres$ docker stop postgres_pg_daten_1
+
+vagrant@vm-vagrant:~/postgres$ docker ps -a
+CONTAINER ID   IMAGE         COMMAND                  CREATED         STATUS                     PORTS                                                 NAMES
+7ad5a04f1306   postgres      "docker-entrypoint.s…"   6 seconds ago   Up 5 seconds               5432/tcp, 0.0.0.0:5444->5434/tcp, :::5444->5434/tcp   new_postgres
+50df0d604ca6   postgres:12   "docker-entrypoint.s…"   31 hours ago    Up 31 hours                5432/tcp, 0.0.0.0:5433->5433/tcp, :::5433->5433/tcp   postgres_pg_backup_1
+9b23427b154c   postgres:12   "docker-entrypoint.s…"   31 hours ago    Exited (0) 9 minutes ago
+
+
+sudo docker-compose up -d
+
+
+vagrant@vm-vagrant:~/postgres$ docker ps -a
+CONTAINER ID   IMAGE         COMMAND                  CREATED          STATUS                      PORTS                                                 NAMES
+a66ab98a19d2   postgres:12   "docker-entrypoint.s…"   22 seconds ago   Up 21 seconds               5432/tcp, 0.0.0.0:5434->5434/tcp, :::5434->5434/tcp   postgres_pg_new_1
+50df0d604ca6   postgres:12   "docker-entrypoint.s…"   32 hours ago     Up 32 hours                 5432/tcp, 0.0.0.0:5433->5433/tcp, :::5433->5433/tcp   postgres_pg_backup_1
+9b23427b154c   postgres:12   "docker-entrypoint.s…"   32 hours ago     Exited (0) 38 minutes ago
+
+
+vagrant@vm-vagrant:~/postgres$ psql -U postgres -h 172.18.0.2
+Password for user postgres: 
+psql (12.7 (Ubuntu 12.7-0ubuntu0.20.04.1))
+Type "help" for help.
+
+postgres=# \l
+                                 List of databases
+   Name    |  Owner   | Encoding |  Collate   |   Ctype    |   Access privileges   
+-----------+----------+----------+------------+------------+-----------------------
+ postgres  | postgres | UTF8     | en_US.utf8 | en_US.utf8 | 
+ stage     | postgres | UTF8     | en_US.utf8 | en_US.utf8 | 
+ template0 | postgres | UTF8     | en_US.utf8 | en_US.utf8 | =c/postgres          +
+           |          |          |            |            | postgres=CTc/postgres
+ template1 | postgres | UTF8     | en_US.utf8 | en_US.utf8 | =c/postgres          +
+           |          |          |            |            | postgres=CTc/postgres
+(4 rows)
+
+
+pg_dumpall -U postgres -h 172.18.0.3 > /tmp/new_test_dump
+psql -U postgres -h 172.18.0.2 -f /tmp/new_test_dump postgres
+
+
+vagrant@vm-vagrant:~/postgres$ psql -U postgres -h 172.18.0.2
+Password for user postgres: 
+psql (12.7 (Ubuntu 12.7-0ubuntu0.20.04.1))
+Type "help" for help.
+
+postgres=# \l
+                                 List of databases
+   Name    |  Owner   | Encoding |  Collate   |   Ctype    |   Access privileges   
+-----------+----------+----------+------------+------------+-----------------------
+ postgres  | postgres | UTF8     | en_US.utf8 | en_US.utf8 | 
+ stage     | postgres | UTF8     | en_US.utf8 | en_US.utf8 | 
+ template0 | postgres | UTF8     | en_US.utf8 | en_US.utf8 | =c/postgres          +
+           |          |          |            |            | postgres=CTc/postgres
+ template1 | postgres | UTF8     | en_US.utf8 | en_US.utf8 | =c/postgres          +
+           |          |          |            |            | postgres=CTc/postgres
+ test_db   | postgres | UTF8     | en_US.utf8 | en_US.utf8 | 
+(5 rows)
+
+
+********************************************************************************
+
+https://hub.docker.com/repository/docker/salierisantuzzu/netology
+
+********************************************************************************

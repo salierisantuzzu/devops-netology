@@ -1,0 +1,184 @@
+Домашнее задание к занятию "6.4. PostgreSQL".
+********************************************************************************
+
+Задача 1.
+*********
+
+- Используя docker поднимите инстанс PostgreSQL (версию 13). Данные БД сохраните в
+volume.
+
+-----------------------------
+version: '3'
+
+services:
+  pg_daten:
+    image: postgres:13
+    restart: always
+    environment:
+      - POSTGRES_PASSWORD=secret
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=stage
+    volumes:
+      - ./pg_daten:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+-----------------------------
+
+- Подключитесь к БД PostgreSQL используя psql.
+
+-----------------------------
+root@35457b898bfb:/# psql -h localhost -U postgres
+psql (13.3 (Debian 13.3-1.pgdg100+1))
+Type "help" for help.
+
+postgres=#
+-----------------------------
+
+- Воспользуйтесь командой \? для вывода подсказки по имеющимся в psql
+управляющим командам.
+
+Скрин - 01_01.png
+
+- Найдите и приведите управляющие команды для:
+
+    - вывода списка БД
+-----------------------------
+postgres=# \l
+                                 List of databases
+   Name    |  Owner   | Encoding |  Collate   |   Ctype    |   Access privileges   
+-----------+----------+----------+------------+------------+-----------------------
+ postgres  | postgres | UTF8     | en_US.utf8 | en_US.utf8 | 
+ stage     | postgres | UTF8     | en_US.utf8 | en_US.utf8 | 
+ template0 | postgres | UTF8     | en_US.utf8 | en_US.utf8 | =c/postgres          +
+           |          |          |            |            | postgres=CTc/postgres
+ template1 | postgres | UTF8     | en_US.utf8 | en_US.utf8 | =c/postgres          +
+           |          |          |            |            | postgres=CTc/postgres
+(4 rows)
+-----------------------------
+
+    - подключения к БД
+-----------------------------
+postgres=# \connect stage;
+You are now connected to database "stage" as user "postgres".
+stage=#
+-----------------------------
+
+    - вывода списка таблиц
+-----------------------------
+stage=# \dt
+Did not find any relations.
+-----------------------------
+
+    - вывода описания содержимого таблиц
+-----------------------------
+stage=# \d stage;
+Did not find any relation named "stage".
+-----------------------------
+
+    - выхода из psql
+-----------------------------
+stage=# \q
+root@35457b898bfb:/#
+-----------------------------
+
+********************************************************************************
+
+Задача 2.
+*********
+
+- Используя psql создайте БД test_database.
+-----------------------------
+postgres=# CREATE DATABASE test_database OWNER = "postgres";
+CREATE DATABASE
+postgres=#
+-----------------------------
+postgres=# \l
+                                   List of databases
+     Name      |  Owner   | Encoding |  Collate   |   Ctype    |   Access privileges   
+---------------+----------+----------+------------+------------+-----------------------
+ postgres      | postgres | UTF8     | en_US.utf8 | en_US.utf8 | 
+ stage         | postgres | UTF8     | en_US.utf8 | en_US.utf8 | 
+ template0     | postgres | UTF8     | en_US.utf8 | en_US.utf8 | =c/postgres          +
+               |          |          |            |            | postgres=CTc/postgres
+ template1     | postgres | UTF8     | en_US.utf8 | en_US.utf8 | =c/postgres          +
+               |          |          |            |            | postgres=CTc/postgres
+ test_database | postgres | UTF8     | en_US.utf8 | en_US.utf8 | 
+(5 rows)
+-----------------------------
+
+- Изучите бэкап БД.
+-----------------------------
+cd /tmp
+nano /tmp/test_dump.sql
+-----------------------------
+
+- Восстановите бэкап БД в test_database.
+-----------------------------
+cat /tmp/test_dump.sql | psql -h localhost -U postgres -d test_database
+-----------------------------
+
+- Перейдите в управляющую консоль psql внутри контейнера.
+-----------------------------
+psql -U postgres
+-----------------------------
+
+- Подключитесь к восстановленной БД и проведите операцию ANALYZE для сбора
+статистики по таблице.
+-----------------------------
+root@35457b898bfb:/# psql -h localhost -U postgres
+psql (13.3 (Debian 13.3-1.pgdg100+1))
+Type "help" for help.
+
+postgres=# \connect test_database;
+You are now connected to database "test_database" as user "postgres".
+test_database=# \dt+
+                              List of relations
+ Schema |  Name  | Type  |  Owner   | Persistence |    Size    | Description 
+--------+--------+-------+----------+-------------+------------+-------------
+ public | orders | table | postgres | permanent   | 8192 bytes | 
+(1 row)
+
+test_database=#
+-----------------------------
+
+test_database=# EXPLAIN ANALYZE SELECT * FROM orders;
+                                           QUERY PLAN                                            
+-------------------------------------------------------------------------------------------------
+ Seq Scan on orders  (cost=0.00..1.08 rows=8 width=24) (actual time=0.007..0.009 rows=8 loops=1)
+ Planning Time: 0.038 ms
+ Execution Time: 0.020 ms
+(3 rows)
+-----------------------------
+
+- Используя таблицу pg_stats, найдите столбец таблицы orders с наибольшим
+средним значением размера элементов в байтах.
+
+- Приведите в ответе команду, которую вы использовали для вычисления и
+полученный результат.
+
+********************************************************************************
+
+Задача 3.
+*********
+
+Архитектор и администратор БД выяснили, что ваша таблица orders разрослась до
+невиданных размеров и поиск по ней занимает долгое время. Вам, как успешному
+выпускнику курсов DevOps в нетологии предложили провести разбиение таблицы на 2
+(шардировать на orders_1 - price>499 и orders_2 - price<=499).
+
+- Предложите SQL-транзакцию для проведения данной операции.
+
+- Можно ли было изначально исключить "ручное" разбиение при проектировании
+таблицы orders?
+
+********************************************************************************
+
+Задача 4.
+*********
+
+- Используя утилиту pg_dump создайте бекап БД test_database.
+
+- Как бы вы доработали бэкап-файл, чтобы добавить уникальность значения столбца
+title для таблиц test_database?
+
+********************************************************************************
