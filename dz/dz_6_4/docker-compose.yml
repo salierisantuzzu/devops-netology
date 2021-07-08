@@ -6,8 +6,8 @@ services:
     restart: always
     environment:
       - POSTGRES_PASSWORD=secret
-      - POSTGRES_USER=postgres
-      - POSTGRES_DB=stage
+#      - POSTGRES_USER=postgres
+#      - POSTGRES_DB=stage
     volumes:
       - ./pg_daten:/var/lib/postgresql/data
     ports:

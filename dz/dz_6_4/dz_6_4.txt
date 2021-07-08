@@ -149,12 +149,56 @@ test_database=# EXPLAIN ANALYZE SELECT * FROM orders;
  Execution Time: 0.020 ms
 (3 rows)
 -----------------------------
+-----------------------------
+test_database=# ANALYZE VERBOSE orders;
+INFO:  analyzing "public.orders"
+INFO:  "orders": scanned 1 of 1 pages, containing 8 live rows and 0 dead rows; 8 rows in sample, 8 estimated total rows
+ANALYZE
+test_database=#
+-----------------------------
 
 - Используя таблицу pg_stats, найдите столбец таблицы orders с наибольшим
 средним значением размера элементов в байтах.
 
+avg_width	integer	 	Средний размер элементов в столбце, в байтах
+
+-----------------------------
+test_database=# SELECT attname, avg_width FROM pg_stats WHERE tablename = 'orders' ORDER BY avg_width DESC;
+ attname | avg_width 
+---------+-----------
+ title   |        16
+ id      |         4
+ price   |         4
+(3 rows)
+-----------------------------
+
 - Приведите в ответе команду, которую вы использовали для вычисления и
 полученный результат.
+
+-----------------------------
+test_database=# select * from orders;
+ id |        title         | price 
+----+----------------------+-------
+  1 | War and peace        |   100
+  2 | My little database   |   500
+  3 | Adventure psql time  |   300
+  4 | Server gravity falls |   300
+  5 | Log gossips          |   123
+  6 | WAL never lies       |   900
+  7 | Me and my bash-pet   |   499
+  8 | Dbiezdmin            |   501
+(8 rows)
+-----------------------------
+
+-----------------------------
+test_database=# SELECT attname, avg_width FROM pg_stats WHERE tablename = 'orders' ORDER BY avg_width DESC;
+ attname | avg_width 
+---------+-----------
+ title   |        16
+ id      |         4
+ price   |         4
+(3 rows)
+-----------------------------
 
 ********************************************************************************
 
@@ -168,8 +212,86 @@ test_database=# EXPLAIN ANALYZE SELECT * FROM orders;
 
 - Предложите SQL-транзакцию для проведения данной операции.
 
+-----------------------------
+test_database=# CREATE TABLE orders_1 ( CHECK ( price > 499 ) ) INHERITS (orders);
+CREATE TABLE
+test_database=# CREATE TABLE orders_2 ( CHECK ( price <= 499 ) ) INHERITS (orders);
+CREATE TABLE
+test_database=# \dt+
+                               List of relations
+ Schema |   Name   | Type  |  Owner   | Persistence |    Size    | Description 
+--------+----------+-------+----------+-------------+------------+-------------
+ public | orders   | table | postgres | permanent   | 8192 bytes | 
+ public | orders_1 | table | postgres | permanent   | 0 bytes    | 
+ public | orders_2 | table | postgres | permanent   | 0 bytes    | 
+(3 rows)
+
+test_database=# INSERT INTO orders_1 (SELECT * FROM orders WHERE price > 499);
+INSERT 0 3
+test_database=# INSERT INTO orders_2 (SELECT * FROM orders WHERE price <= 499);
+INSERT 0 5
+test_database=# \dt+
+                               List of relations
+ Schema |   Name   | Type  |  Owner   | Persistence |    Size    | Description 
+--------+----------+-------+----------+-------------+------------+-------------
+ public | orders   | table | postgres | permanent   | 8192 bytes | 
+ public | orders_1 | table | postgres | permanent   | 8192 bytes | 
+ public | orders_2 | table | postgres | permanent   | 8192 bytes | 
+(3 rows)
+
+test_database=# SELECT * FROM orders_1;
+ id |       title        | price 
+----+--------------------+-------
+  2 | My little database |   500
+  6 | WAL never lies     |   900
+  8 | Dbiezdmin          |   501
+(3 rows)
+
+test_database=# SELECT * FROM orders_2;
+ id |        title         | price 
+----+----------------------+-------
+  1 | War and peace        |   100
+  3 | Adventure psql time  |   300
+  4 | Server gravity falls |   300
+  5 | Log gossips          |   123
+  7 | Me and my bash-pet   |   499
+(5 rows)
+
+test_database=#
+-----------------------------
+
 - Можно ли было изначально исключить "ручное" разбиение при проектировании
 таблицы orders?
+
+Да. Изначально подумав о разрастании таблиц.
+
+SQL Шардинг позволяет разделить данные таблиц SQL на несколько инстансов
+• Двигает параллелизацию в SQL на шаг вперед благодаря разделению потоков работ на
+несколько серверов (вместо нескольких процессоров на 1 сервере)
+• Распределенные данные далее могут быть использованы для параллельной загрузки, а
+также сторонными библиотеками (например Apache Spark)
+
+Шардинг
+• Когда ф-ое разбиение и репликация не помогают
+• Разбиваем данные на маленькие кусочки и храним на многих серверах
+“Единственное” решение для крупного масштаба
+• Нужно аккуратное планирование
+• Может быть не просто реализовать
+– Особенно если это не предусмотрено дизайном
+• Как разбивать данные очень критичный вопрос
+– Часто бывает надо несколько копий данных с разным разбиением
+
+Шардинг и Репликация
+• Шардинг используется вместе с репликацией
+– В основном для высокой доступности
+• Использовать Master-Master репликацию – просто использовать.
+
+Как разбивать данные ?
+• Большинство запросов должно быть к одному шарду
+• Шард не становится слишком большим
+• Большая часть траффика может быть из одной страны
+• Множество разбиений одновременно
+• Полное дублирование данных или сохранение только указателя
 
 ********************************************************************************
 
@@ -177,8 +299,38 @@ test_database=# EXPLAIN ANALYZE SELECT * FROM orders;
 *********
 
 - Используя утилиту pg_dump создайте бекап БД test_database.
+-----------------------------
+root@16e6343ebedd:/tmp# pg_dump -U postgres > /tmp/new_dump_database.dump
+root@16e6343ebedd:/tmp# ls -la
+total 16
+drwxrwxrwt 1 root root 4096 Jul  8 09:59 .
+drwxr-xr-x 1 root root 4096 Jul  8 07:14 ..
+-rw-r--r-- 1 root root  541 Jul  8 09:59 new_dump_database.dump
+-rw-r--r-- 1 root root 2081 Jul  8 07:25 test_dump.sql
+root@16e6343ebedd:/tmp#
+-----------------------------
 
 - Как бы вы доработали бэкап-файл, чтобы добавить уникальность значения столбца
 title для таблиц test_database?
+
+pg_dumpall -U postgres -h localhost > /tmp/new_dumpall_database.dump
+
+nano /tmp/new_dumpall_database.dump
+
+В файл дампа, после строк
+-----------------------------
+CREATE TABLE public.orders (
+    id integer NOT NULL,
+    title character varying(80) NOT NULL,
+    price integer DEFAULT 0
+);
+-----------------------------
+
+добавить
+-----------------------------
+CREATE UNIQUE INDEX uniq_title ON orders ( title );
+-----------------------------
+
+сохранить.
 
 ********************************************************************************
