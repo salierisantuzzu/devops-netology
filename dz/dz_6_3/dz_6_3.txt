@@ -19,11 +19,11 @@ services:
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: secret
-#      MYSQL_DATABASE: wordpress
-#      MYSQL_USER: wordpress
-#      MYSQL_PASSWORD: wordpress
+#      MYSQL_DATABASE: my_db
+#      MYSQL_USER: adm_user
+#      MYSQL_PASSWORD: my_pass
     volumes:
-      - ./mysql_daten:/var/lib/mysql
+      - ../mysql_daten:/var/lib/mysql
     ports:
       - 3306:3306
 
@@ -32,12 +32,18 @@ volumes:
 -----------------------------
 
 - Изучите бэкап БД и восстановитесь из него.
+- Перейдите в управляющую консоль mysql внутри контейнера.
+- Подключитесь к восстановленной БД и получите список таблиц из этой БД.
 
+-----------------------------
 cd /tmp
-wget https://github.com/netology-code/virt-homeworks/blob/master/06-db-03-mysql/test_data/test_dump.sql
+nano /test_dump.sql
+-----------------------------
 
+-----------------------------
 mysql -u root -p
 
+-----------------------------
 mysql> show databases;
 +--------------------+
 | Database           |
@@ -48,7 +54,9 @@ mysql> show databases;
 | sys                |
 +--------------------+
 4 rows in set (0.02 sec)
+-----------------------------
 
+-----------------------------
 CREATE DATABASE test_db;
 
 mysql> show databases;
@@ -62,23 +70,95 @@ mysql> show databases;
 | test_db            |
 +--------------------+
 5 rows in set (0.00 sec)
+-----------------------------
 
-mysql> quit;
+-----------------------------
+mysql> use test_db;
+Reading table information for completion of table and column names
+You can turn off this feature to get a quicker startup with -A
 
+Database changed
+-----------------------------
 
+-----------------------------
+source /tmp/test_dump.sql
+-----------------------------
 
+-----------------------------
+mysql> show tables;
++-------------------+
+| Tables_in_test_db |
++-------------------+
+| orders            |
++-------------------+
+1 row in set (0.00 sec)
+-----------------------------
 
-
-- Перейдите в управляющую консоль mysql внутри контейнера.
+-----------------------------
+mysql> select * from orders;
++----+-----------------------+-------+
+| id | title                 | price |
++----+-----------------------+-------+
+|  1 | War and Peace         |   100 |
+|  2 | My little pony        |   500 |
+|  3 | Adventure mysql times |   300 |
+|  4 | Server gravity falls  |   300 |
+|  5 | Log gossips           |   123 |
++----+-----------------------+-------+
+5 rows in set (0.00 sec)
+-----------------------------
 
 - Используя команду \h получите список управляющих команд.
+
+-----------------------------
+mysql>\h
+
+Скрин - 01_01.png
+-----------------------------
+
 
 - Найдите команду для выдачи статуса БД и приведите в ответе из ее вывода версию
 сервера БД.
 
-- Подключитесь к восстановленной БД и получите список таблиц из этой БД.
+-----------------------------
+mysql> \s
+--------------
+mysql  Ver 8.0.25 for Linux on x86_64 (MySQL Community Server - GPL)
+
+Connection id:		14
+Current database:	test_db
+Current user:		root@localhost
+SSL:			Not in use
+Current pager:		stdout
+Using outfile:		''
+Using delimiter:	;
+Server version:		8.0.25 MySQL Community Server - GPL
+Protocol version:	10
+Connection:		Localhost via UNIX socket
+Server characterset:	utf8mb4
+Db     characterset:	utf8mb4
+Client characterset:	latin1
+Conn.  characterset:	latin1
+UNIX socket:		/var/run/mysqld/mysqld.sock
+Binary data as:		Hexadecimal
+Uptime:			25 min 59 sec
+
+Threads: 2  Questions: 93  Slow queries: 0  Opens: 199  Flush tables: 3  Open tables: 115  Queries per second avg: 0.059
+--------------
+-----------------------------
+
 
 - Приведите в ответе количество записей с price > 300.
+
+-----------------------------
+mysql> select * from orders where price > 300;
++----+----------------+-------+
+| id | title          | price |
++----+----------------+-------+
+|  2 | My little pony |   500 |
++----+----------------+-------+
+1 row in set (0.00 sec)
+-----------------------------
 
 В следующих заданиях мы будем продолжать работу с данным контейнером.
 
@@ -88,18 +168,76 @@ mysql> quit;
 *********
 Создайте пользователя test в БД c паролем test-pass, используя:
 
-    плагин авторизации mysql_native_password
-    срок истечения пароля - 180 дней
-    количество попыток авторизации - 3
-    максимальное количество запросов в час - 100
-    аттрибуты пользователя:
+    - плагин авторизации mysql_native_password
+
+nano /etc/mysql/my.cnf
+[mysqld]
+default_authentication_plugin = mysql_native_password
+
+mysql -u root -p
+
+-----------------------------
+mysql> CREATE USER 'test'@'localhost' IDENTIFIED WITH mysql_native_password BY 'my_password';
+Query OK, 0 rows affected (0.02 sec)
+-----------------------------
+
+-----------------------------
+mysql> SHOW GRANTS FOR 'test'@'localhost';
++------------------------------------------+
+| Grants for test@localhost                |
++------------------------------------------+
+| GRANT USAGE ON *.* TO `test`@`localhost` |
++------------------------------------------+
+1 row in set (0.00 sec)
+-----------------------------
+
+-----------------------------
+mysql> GRANT ALL PRIVILEGES ON test_db.* TO 'test'@'localhost';
+Query OK, 0 rows affected, 1 warning (0.01 sec)
+-----------------------------
+
+-----------------------------
+mysql> SHOW GRANTS FOR 'test'@'localhost';
++-----------------------------------------------------------+
+| Grants for test@localhost                                 |
++-----------------------------------------------------------+
+| GRANT USAGE ON *.* TO `test`@`localhost`                  |
+| GRANT ALL PRIVILEGES ON `test_db`.* TO `test`@`localhost` |
++-----------------------------------------------------------+
+2 rows in set (0.00 sec)
+-----------------------------
+
+
+    - срок истечения пароля - 180 дней
+-----------------------------
+mysql> ALTER USER 'test'@'localhost' PASSWORD EXPIRE INTERVAL 180 DAY;
+Query OK, 0 rows affected (0.01 sec)
+-----------------------------
+
+    - количество попыток авторизации - 3
+
+ALTER USER 'test'@'localhost' WITH FAILED_LOGIN_ATTEMPTS 3;
+
+    - максимальное количество запросов в час - 100
+-----------------------------
+mysql> ALTER USER 'test'@'localhost' WITH MAX_QUERIES_PER_HOUR 100;
+Query OK, 0 rows affected (0.03 sec)
+-----------------------------
+
+
+    - аттрибуты пользователя:
         Фамилия "Pretty"
         Имя "James"
 
 Предоставьте привелегии пользователю test на операции SELECT базы test_db.
 
-Используя таблицу INFORMATION_SCHEMA.USER_ATTRIBUTES получите данные по пользователю test и приведите в ответе к задаче.
-Задача 3
+Используя таблицу INFORMATION_SCHEMA.USER_ATTRIBUTES получите данные по
+пользователю test и приведите в ответе к задаче.
+
+********************************************************************************
+
+Задача 3.
+*********
 
 Установите профилирование SET profiling = 1. Изучите вывод профилирования команд SHOW PROFILES;.
 
@@ -110,7 +248,10 @@ mysql> quit;
     на MyISAM
     на InnoDB
 
-Задача 4
+********************************************************************************
+
+Задача 4.
+*********
 
 Изучите файл my.cnf в директории /etc/mysql.
 
