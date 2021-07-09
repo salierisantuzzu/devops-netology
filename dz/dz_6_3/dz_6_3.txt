@@ -74,14 +74,13 @@ mysql> show databases;
 
 -----------------------------
 mysql> use test_db;
-Reading table information for completion of table and column names
-You can turn off this feature to get a quicker startup with -A
-
 Database changed
 -----------------------------
 
 -----------------------------
 source /tmp/test_dump.sql
+
+Скрин - 01_00.png
 -----------------------------
 
 -----------------------------
@@ -177,7 +176,7 @@ default_authentication_plugin = mysql_native_password
 mysql -u root -p
 
 -----------------------------
-mysql> CREATE USER 'test'@'localhost' IDENTIFIED WITH mysql_native_password BY 'my_password';
+mysql> CREATE USER 'test'@'localhost' IDENTIFIED WITH mysql_native_password BY 'testpass';
 Query OK, 0 rows affected (0.02 sec)
 -----------------------------
 
@@ -191,7 +190,7 @@ mysql> SHOW GRANTS FOR 'test'@'localhost';
 1 row in set (0.00 sec)
 -----------------------------
 
------------------------------
+---------------------------------------------------------------------------------------------------------------------------------------------
 mysql> GRANT ALL PRIVILEGES ON test_db.* TO 'test'@'localhost';
 Query OK, 0 rows affected, 1 warning (0.01 sec)
 -----------------------------
@@ -205,7 +204,13 @@ mysql> SHOW GRANTS FOR 'test'@'localhost';
 | GRANT ALL PRIVILEGES ON `test_db`.* TO `test`@`localhost` |
 +-----------------------------------------------------------+
 2 rows in set (0.00 sec)
------------------------------
+
+mysql> GRANT ALL PRIVILEGES ON *.* TO `root`@`localhost`;
+Query OK, 0 rows affected, 1 warning (0.05 sec)
+mysql> UPDATE information_schema.USER_ATTRIBUTES SET ATTRIBUTE = 'James Pretty' WHERE USER = 'test';
+ERROR 1044 (42000): Access denied for user 'root'@'localhost' to database 'information_schema'
+
+----------------------------------------------------------------------------------------------------------------------------------------------
 
 
     - срок истечения пароля - 180 дней
@@ -215,8 +220,10 @@ Query OK, 0 rows affected (0.01 sec)
 -----------------------------
 
     - количество попыток авторизации - 3
-
-ALTER USER 'test'@'localhost' WITH FAILED_LOGIN_ATTEMPTS 3;
+-----------------------------
+mysql> ALTER USER 'test'@'localhost' FAILED_LOGIN_ATTEMPTS 3;
+Query OK, 0 rows affected (0.01 sec)
+-----------------------------
 
     - максимальное количество запросов в час - 100
 -----------------------------
@@ -225,42 +232,330 @@ Query OK, 0 rows affected (0.03 sec)
 -----------------------------
 
 
-    - аттрибуты пользователя:
-        Фамилия "Pretty"
-        Имя "James"
+- Предоставьте привелегии пользователю test на операции SELECT базы test_db.
+-----------------------------
+mysql> GRANT SELECT ON test_db.* TO 'test'@'localhost';
+Query OK, 0 rows affected, 1 warning (0.06 sec)
 
-Предоставьте привелегии пользователю test на операции SELECT базы test_db.
+mysql> SHOW GRANTS FOR 'test'@'localhost';
++---------------------------------------------------+
+| Grants for test@localhost                         |
++---------------------------------------------------+
+| GRANT USAGE ON *.* TO `test`@`localhost`          |
+| GRANT SELECT ON `test_db`.* TO `test`@`localhost` |
++---------------------------------------------------+
+2 rows in set (0.00 sec)
+-----------------------------
 
-Используя таблицу INFORMATION_SCHEMA.USER_ATTRIBUTES получите данные по
+
+- Используя таблицу INFORMATION_SCHEMA.USER_ATTRIBUTES получите данные по
 пользователю test и приведите в ответе к задаче.
+-----------------------------
+mysql> show databases;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| mysql              |
+| performance_schema |
+| sys                |
+| test_db            |
++--------------------+
+5 rows in set (0.00 sec)
+
+mysql> use information_schema;
+Database changed
+mysql> show tables;
++---------------------------------------+
+| Tables_in_information_schema          |
++---------------------------------------+
+| ADMINISTRABLE_ROLE_AUTHORIZATIONS     |
+| APPLICABLE_ROLES                      |
+...
+| TRIGGERS                              |
+| USER_ATTRIBUTES                       |
+...
++---------------------------------------+
+79 rows in set (0.01 sec)
+
+mysql> SELECT * FROM information_schema.USER_ATTRIBUTES;
++------------------+-----------+-----------+
+| USER             | HOST      | ATTRIBUTE |
++------------------+-----------+-----------+
+| root             | %         | NULL      |
+| mysql.infoschema | localhost | NULL      |
+| mysql.session    | localhost | NULL      |
+| mysql.sys        | localhost | NULL      |
+| root             | localhost | NULL      |
+| test             | localhost | NULL      |
++------------------+-----------+-----------+
+6 rows in set (0.00 sec)
+
+mysql> SELECT * FROM information_schema.USER_ATTRIBUTES WHERE USER = 'test';
++------+-----------+-----------+
+| USER | HOST      | ATTRIBUTE |
++------+-----------+-----------+
+| test | localhost | NULL      |
++------+-----------+-----------+
+1 row in set (0.01 sec)
+-----------------------------
 
 ********************************************************************************
+
 
 Задача 3.
 *********
 
-Установите профилирование SET profiling = 1. Изучите вывод профилирования команд SHOW PROFILES;.
+- Установите профилирование SET profiling = 1. Изучите вывод профилирования
+команд SHOW PROFILES;.
+-----------------------------
+mysql> SET profiling = 1;
+Query OK, 0 rows affected, 1 warning (0.00 sec)
 
-Исследуйте, какой engine используется в таблице БД test_db и приведите в ответе.
+...
 
-Измените engine и приведите время выполнения и запрос на изменения из профайлера в ответе:
+mysql> show profiles;
++----------+------------+-------------------+
+| Query_ID | Duration   | Query             |
++----------+------------+-------------------+
+|        1 | 0.00175125 | show databases    |
+|        2 | 0.00452450 | show tables       |
+|        3 | 0.00056400 | SELECT DATABASE() |
+|        4 | 0.00168250 | show databases    |
+|        5 | 0.00235725 | show tables       |
+|        6 | 0.00032750 | SET profiling = 1 |
++----------+------------+-------------------+
+6 rows in set, 1 warning (0.00 sec)
 
-    на MyISAM
-    на InnoDB
+mysql> show profile;
++----------------+----------+
+| Status         | Duration |
++----------------+----------+
+| starting       | 0.000125 |
+| Opening tables | 0.000065 |
+| query end      | 0.000017 |
+| closing tables | 0.000020 |
+| freeing items  | 0.000029 |
+| cleaning up    | 0.000072 |
++----------------+----------+
+6 rows in set, 1 warning (0.00 sec)
+-----------------------------
+
+
+- Исследуйте, какой engine используется в таблице БД test_db и приведите в
+ответе.
+-----------------------------
+mysql> SHOW TABLE STATUS FROM `test_db`;
++--------+--------+---------+------------+------+----------------+-------------+-----------------+--------------+-----------+----------------+---------------------+---------------------+------------+--------------------+----------+----------------+---------+
+| Name   | Engine | Version | Row_format | Rows | Avg_row_length | Data_length | Max_data_length | Index_length | Data_free | Auto_increment | Create_time         | Update_time         | Check_time | Collation          | Checksum | Create_options | Comment |
++--------+--------+---------+------------+------+----------------+-------------+-----------------+--------------+-----------+----------------+---------------------+---------------------+------------+--------------------+----------+----------------+---------+
+| orders | InnoDB |      10 | Dynamic    |    5 |           3276 |       16384 |               0 |            0 |         0 |              6 | 2021-07-09 10:29:55 | 2021-07-09 10:29:55 | NULL       | utf8mb4_0900_ai_ci |     NULL |                |         |
++--------+--------+---------+------------+------+----------------+-------------+-----------------+--------------+-----------+----------------+---------------------+---------------------+------------+--------------------+----------+----------------+---------+
+1 row in set (0.01 sec)
+
+mysql> SHOW TABLE STATUS FROM `test_db` LIKE 'orders';
++--------+--------+---------+------------+------+----------------+-------------+-----------------+--------------+-----------+----------------+---------------------+---------------------+------------+--------------------+----------+----------------+---------+
+| Name   | Engine | Version | Row_format | Rows | Avg_row_length | Data_length | Max_data_length | Index_length | Data_free | Auto_increment | Create_time         | Update_time         | Check_time | Collation          | Checksum | Create_options | Comment |
++--------+--------+---------+------------+------+----------------+-------------+-----------------+--------------+-----------+----------------+---------------------+---------------------+------------+--------------------+----------+----------------+---------+
+| orders | InnoDB |      10 | Dynamic    |    5 |           3276 |       16384 |               0 |            0 |         0 |              6 | 2021-07-09 10:29:55 | 2021-07-09 10:29:55 | NULL       | utf8mb4_0900_ai_ci |     NULL |                |         |
++--------+--------+---------+------------+------+----------------+-------------+-----------------+--------------+-----------+----------------+---------------------+---------------------+------------+--------------------+----------+----------------+---------+
+1 row in set (0.01 sec)
+-----------------------------
+
+
+- Измените engine и приведите время выполнения и запрос на изменения из
+профайлера в ответе:
+
+    - на InnoDB
+-----------------------------
+mysql> ALTER TABLE orders ENGINE = InnoDB;
+Query OK, 0 rows affected (0.06 sec)
+Records: 0  Duplicates: 0  Warnings: 0
+
+mysql> show profile;
++--------------------------------+----------+
+| Status                         | Duration |
++--------------------------------+----------+
+| starting                       | 0.000362 |
+| Executing hook on transaction  | 0.000027 |
+| starting                       | 0.000054 |
+| checking permissions           | 0.000059 |
+| checking permissions           | 0.000021 |
+| init                           | 0.000037 |
+| Opening tables                 | 0.001021 |
+| setup                          | 0.000324 |
+| creating table                 | 0.000183 |
+| After create                   | 0.000168 |
+| System lock                    | 0.000023 |
+| preparing for alter table      | 0.019089 |
+| altering table                 | 0.005755 |
+| committing alter table to stor | 0.020976 |
+| end                            | 0.000187 |
+| waiting for handler commit     | 0.000019 |
+| waiting for handler commit     | 0.015352 |
+| query end                      | 0.000027 |
+| closing tables                 | 0.000009 |
+| waiting for handler commit     | 0.000050 |
+| freeing items                  | 0.000044 |
+| cleaning up                    | 0.000039 |
++--------------------------------+----------+
+22 rows in set, 1 warning (0.01 sec)
+
+mysql> show profiles;
++----------+------------+------------------------------------------------+
+| Query_ID | Duration   | Query                                          |
++----------+------------+------------------------------------------------+
+|        1 | 0.00175125 | show databases                                 |
+|        2 | 0.00452450 | show tables                                    |
+|        3 | 0.00056400 | SELECT DATABASE()                              |
+|        4 | 0.00168250 | show databases                                 |
+|        5 | 0.00235725 | show tables                                    |
+|        6 | 0.00032750 | SET profiling = 1                              |
+|        7 | 0.01073825 | SHOW TABLE STATUS FROM `test_db`               |
+|        8 | 0.00344850 | SHOW TABLE STATUS FROM `test_db` LIKE 'orders' |
+|        9 | 0.06382125 | ALTER TABLE orders ENGINE = InnoDB             |
++----------+------------+------------------------------------------------+
+9 rows in set, 1 warning (0.00 sec)
+-----------------------------
+
+
+    - на MyISAM
+-----------------------------
+mysql> ALTER TABLE orders ENGINE = MyISAM;
+Query OK, 5 rows affected (0.14 sec)
+Records: 5  Duplicates: 0  Warnings: 0
+
+mysql> show profile;
++--------------------------------+----------+
+| Status                         | Duration |
++--------------------------------+----------+
+| starting                       | 0.000194 |
+| Executing hook on transaction  | 0.000021 |
+| starting                       | 0.000053 |
+| checking permissions           | 0.000019 |
+| checking permissions           | 0.000018 |
+| init                           | 0.000032 |
+| Opening tables                 | 0.000705 |
+| setup                          | 0.000259 |
+| creating table                 | 0.001767 |
+| waiting for handler commit     | 0.000035 |
+| waiting for handler commit     | 0.054890 |
+| After create                   | 0.005603 |
+| System lock                    | 0.000077 |
+| copy to tmp table              | 0.000293 |
+| waiting for handler commit     | 0.000026 |
+| waiting for handler commit     | 0.000041 |
+| waiting for handler commit     | 0.000086 |
+| rename result table            | 0.000226 |
+| waiting for handler commit     | 0.021823 |
+| waiting for handler commit     | 0.000036 |
+| waiting for handler commit     | 0.006639 |
+| waiting for handler commit     | 0.000029 |
+| waiting for handler commit     | 0.018216 |
+| waiting for handler commit     | 0.000037 |
+| waiting for handler commit     | 0.005114 |
+| end                            | 0.012333 |
+| query end                      | 0.005492 |
+| closing tables                 | 0.000028 |
+| waiting for handler commit     | 0.000068 |
+| freeing items                  | 0.000070 |
+| cleaning up                    | 0.000121 |
++--------------------------------+----------+
+31 rows in set, 1 warning (0.00 sec)
+
+mysql> show profiles;
++----------+------------+------------------------------------------------+
+| Query_ID | Duration   | Query                                          |
++----------+------------+------------------------------------------------+
+|        1 | 0.00175125 | show databases                                 |
+|        2 | 0.00452450 | show tables                                    |
+|        3 | 0.00056400 | SELECT DATABASE()                              |
+|        4 | 0.00168250 | show databases                                 |
+|        5 | 0.00235725 | show tables                                    |
+|        6 | 0.00032750 | SET profiling = 1                              |
+|        7 | 0.01073825 | SHOW TABLE STATUS FROM `test_db`               |
+|        8 | 0.00344850 | SHOW TABLE STATUS FROM `test_db` LIKE 'orders' |
+|        9 | 0.06382125 | ALTER TABLE orders ENGINE = InnoDB             |
+|       10 | 0.13434775 | ALTER TABLE orders ENGINE = MyISAM             |
++----------+------------+------------------------------------------------+
+10 rows in set, 1 warning (0.00 sec)
+-----------------------------
 
 ********************************************************************************
+
 
 Задача 4.
 *********
 
-Изучите файл my.cnf в директории /etc/mysql.
+- Изучите файл my.cnf в директории /etc/mysql.
+-----------------------------
+root@9817cf0cd8ae:/tmp# cat /etc/mysql/my.cnf
+# Copyright (c) 2017, Oracle and/or its affiliates. All rights reserved.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; version 2 of the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
-Измените его согласно ТЗ (движок InnoDB):
+#
+# The MySQL  Server configuration file.
+#
+# For explanations see
+# http://dev.mysql.com/doc/mysql/en/server-system-variables.html
 
-    Скорость IO важнее сохранности данных
-    Нужна компрессия таблиц для экономии места на диске
-    Размер буффера с незакомиченными транзакциями 1 Мб
-    Буффер кеширования 30% от ОЗУ
-    Размер файла логов операций 100 Мб
+[mysqld]
+pid-file        = /var/run/mysqld/mysqld.pid
+socket          = /var/run/mysqld/mysqld.sock
+datadir         = /var/lib/mysql
+secure-file-priv= NULL
+default_authentication_plugin = mysql_native_password
+
+# Custom config should go here
+!includedir /etc/mysql/conf.d/
+-----------------------------
+
+
+- Измените его согласно ТЗ (движок InnoDB):
+Добавить в [mysqld]:
+innodb_file_per_table
+default-character-set=utf8
+default-storage-engine=innodb
+
+    - Скорость IO важнее сохранности данных
+innodb_flush_log_at_trx_commit=2
+    
+    - Нужна компрессия таблиц для экономии места на диске
+innodb_file_per_table = 1
+    
+    - Размер буффера с незакомиченными транзакциями 1 Мб
+innodb_buffer_pool_size=1M
+
+    - Буффер кеширования 30% от ОЗУ
+Размеры ОЗУ могут быть разными.
+Можно узнать рекомендуемый размер пула буферов InnoDB на основе всех данных и
+индексов InnoDB с дополнительными 60%. И далее использовать полученное значение.
+-----------------------------
+mysql> SELECT CEILING(Total_InnoDB_Bytes*1.6/POWER(1024,3)) RIBPS FROM (SELECT SUM(data_length+index_length) Total_InnoDB_Bytes FROM information_schema.tables WHERE engine='InnoDB') A;
++-------+
+| RIBPS |
++-------+
+|     1 |
++-------+
+1 row in set (0.01 sec)
+-----------------------------
+innodb_buffer_pool_size = 1G
+
+    - Размер файла логов операций 100 Мб
+innodb_log_file_size = 100M
 
 Приведите в ответе измененный файл my.cnf.
+
+********************************************************************************
